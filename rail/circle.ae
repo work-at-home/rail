@@ -1,0 +1,121 @@
+
+#include <ascii.ae>
+#include <lang.ae>
+#include <traffic.ae>
+
+local N1 = mknod("start");
+local N2 = mknod("end");
+
+setc(N1, 0, 0, 0);
+setc(N2, 0, 0, 0);
+
+#ifdef ROUND_1 // create the profile text file
+local file = open("> circle.txt");
+print(file, "%i %i %i\n", 0, 0, 0);
+#endif
+
+local L1 = mklnk(N1, N2, 1, 1);
+
+{
+#define SECTS 360
+  local i = 1, theta = 2 * 3.1415926 / SECTS;
+  for (; i < SECTS; ++ i) {
+#ifndef ROUND_1
+    inspnt(L1, 50 * sin(i * theta), 50 * (1 - cos(i * theta)), 0);
+#else
+    print(file, "%@ %@ %@\n", 50 * sin(i * theta), 50 * (1 - cos(i * theta)), 0);
+#endif
+  }
+#undef SECTS
+}
+
+#ifdef ROUND_1
+print(file, "%i %i %i", 0, 0, 0);
+close(file);
+#else /* Otherwise set up the simulation environment and run. */
+
+local rail_gap = 1.2;
+local train_gap = 0.75;
+local train_carriage_num = 1;
+local train_carriage_wd = 2.4;
+local train_carriage_ht = 3.0;
+local train_carriage_dp = 16.366;
+
+#define GEOMETRY "geom.txt"
+
+{ /* now parse the geometry file */
+  local hnd = open("< " GEOMETRY);
+  local buf = mkstr(256);
+  while (!feof(hnd)) {
+    local line = read(hnd, 255, buf);
+    local i = strchr(line, 0, char_LF);
+    if (i != nil) strset(line, i, char_NULL);
+    i = strchr(line, 0, char_equal);
+    if (i != nil) {
+      local j = strlen(line);
+      strset(line, i, char_NULL);
+      if (strcmp(line, 0, "rail.gap", 0) == 0)
+        rail_gap = stof(line, i + 1);
+      else if (strcmp(line, 0, "train.gap", 0) == 0)
+        train_gap = stof(line, i + 1);
+      else if (strcmp(line, 0, "train.carriage.num", 0) == 0)
+        train_carriage_num = stoi(line, i + 1);
+      else if (strcmp(line, 0, "train.carriage.wd", 0) == 0)
+        train_carriage_wd = stof(line, i + 1);
+      else if (strcmp(line, 0, "train.carriage.ht", 0) == 0)
+        train_carriage_ht = stof(line, i + 1);
+      else if (strcmp(line, 0, "train.carriage.dp", 0) == 0)
+        train_carriage_dp = stof(line, i + 1);
+    }
+  }
+  close(hnd);
+}
+
+/* Properly displaying the rail is a challenge for the platform as it is
+ * designed for simulation of vehicles traveling upon highways,
+ * local streets and so on.  These roads do not support the concept of
+ * crosstie.  To solve the problem, the methodology is as the following.
+ * First `gshow' is called to disable the general drawing procedure for
+ * the rail.  Then the platform virtual reality engine is used to create a
+ * corresponding rail object and put the object on the position that the
+ * rail is supposed to occupy so that people will have the feeling that
+ * a rail is drawn. ;-) */
+
+#include <gl.ae>
+gshow(L1, false);
+glanwd(L1, rail_gap);
+glideng();
+glldlib("./rail.agl"); // You may need to change to the absolute path if failed.
+glpadscen(glldobj(nil, "rail"));
+
+#define SO "../f.dll"
+#define CENTER "center.txt"
+
+local hnd = dlopen(SO);
+call(dlsym(hnd, "f"), cast(CENTER), cast(GEOMETRY)); // must happen in the very first place
+
+rule simple( MODEL = { hnd }) {
+  local V = this();
+  local Lnk = vlink(V);
+  local Len = llen(Lnk), Pos = vpos(V);
+  local X = Len - Pos;
+
+  if (X > 2.55) advance(2.5);
+  else {
+    call(dlsym(hnd, "g"), cast(V), cast(Lnk));
+    putv(V, vlane(V), max(2.5 - X, 0));
+  }
+}
+
+insgrpr(simple, mkgrpr("simple", true));
+storul(mkrul(simple, { "hnd" => hnd }), nil);
+
+vgeom(mkgrpv("train"), train_carriage_dp, train_carriage_wd, train_carriage_ht);
+mkvol(grpv("train"), 1, N1, N2, 1, 1);
+//srand(time());
+emul(36000, 1, 36000);
+/* Calling `dlclose' is not very necessary as libraries loaded during
+ * execution of source scripts will be unloaded when the compiled
+ * parcel is unloaded. */
+dlclose(hnd);
+#endif

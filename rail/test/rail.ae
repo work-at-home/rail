@@ -1,0 +1,8 @@
+
+#include <lang.ae>
+#include <gl.ae>
+
+glideng();
+glscop(-50, 300, -50, 200, -1, 1);
+glldlib("d:/rail/rail.agl");
+glpadscen(glldobj(nil, "rail"));

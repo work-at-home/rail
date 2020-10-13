@@ -1,0 +1,10 @@
+rail.gap=1.2
+rail.crosstie.gap=0.5
+rail.crosstie.wd=1.5
+rail.crosstie.ht=0.05
+rail.crosstie.dp=0.1
+train.carriage.num=5
+train.carriage.wd=2.4
+train.carriage.ht=3.0
+train.carriage.dp=16.366
+train.gap=0.75
